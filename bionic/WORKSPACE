@@ -1,0 +1,86 @@
+workspace(name = "distroless_ubuntu_bionic")
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
+
+# Package Manager
+http_archive(
+    name = "distroless",
+    url = "https://github.com/GoogleContainerTools/distroless/archive/4745c1aa5ad24c379218890c0185088a618a21a8.tar.gz",
+    sha256 = "18776eaabeb4b79ad56224d8cf24d2b7f7c3fb6f40e53f1e630eda4cb8c9b058",
+    strip_prefix = "distroless-4745c1aa5ad24c379218890c0185088a618a21a8",
+)
+
+
+load("@distroless//package_manager:package_manager.bzl", "package_manager_repositories")
+load("@distroless//package_manager:dpkg.bzl", "dpkg_list", "dpkg_src")
+
+package_manager_repositories()
+
+# Docker rules
+http_archive(
+    name = "io_bazel_rules_docker",
+    sha256 = "3556d4972571f288f8c43378295d84ed64fef5b1a875211ee1046f9f6b4258fa",
+    strip_prefix = "rules_docker-0.8.0",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/v0.8.0.tar.gz"],
+)
+
+load(
+    "@io_bazel_rules_docker//repositories:repositories.bzl",
+    container_repositories = "repositories",
+)
+
+container_repositories()
+
+dpkg_src(
+    name = "bionic",
+    package_prefix = "http://archive.ubuntu.com/ubuntu/",
+    packages_gz_url = "http://archive.ubuntu.com/ubuntu/dists/bionic/main/binary-amd64/Packages.gz",
+    sha256 = "ff7fd80e902a1acfba06e7b513711da31abe915d95b3ba39ce198e02efd209e5",
+)
+
+dpkg_src(
+    name = "bionic_updates",
+    package_prefix = "http://archive.ubuntu.com/ubuntu/",
+    packages_gz_url = "http://archive.ubuntu.com/ubuntu/dists/bionic-updates/main/binary-amd64/Packages.gz",
+    sha256 = "d61d6494b3aaa0135c5256a9400901fcf6444c652d9b87aad7d00df299c1bfbd",
+)
+
+dpkg_src(
+    name = "bionic_security",
+    package_prefix = "http://archive.ubuntu.com/ubuntu/",
+    packages_gz_url = "http://archive.ubuntu.com/ubuntu/dists/bionic-security/main/binary-amd64/Packages.gz",
+    sha256 = "be3bdc2599844b47468ad816e26e0d8f9c2339a88f838fbf28322be769602e6a",
+)
+
+dpkg_list(
+    name = "package_bundle",
+    packages = [
+        # Static
+        "base-files",
+        "ca-certificates",
+        "netbase",
+        "tzdata",
+
+        # Base
+        "libc6",
+        "libssl1.1",
+        "openssl",
+    ],
+    # Takes the first package found: security updates should go first
+    # If there was a security fix to a package before the stable release, this will find
+    # the older security release. This happened for debian stretch libc6.
+    sources = [
+        "@bionic_security//file:Packages.json",
+        "@bionic_updates//file:Packages.json",
+        "@bionic//file:Packages.json",
+    ],
+)
+
+# For the debug image
+http_file(
+    name = "busybox",
+    executable = True,
+    sha256 = "b51b9328eb4e60748912e1c1867954a5cf7e9d5294781cae59ce225ed110523c",
+    urls = ["https://busybox.net/downloads/binaries/1.27.1-i686/busybox"],
+)
+
